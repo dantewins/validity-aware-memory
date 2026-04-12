@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 _QUESTION_TYPE_TO_MODE = {
     "single-session-user": QueryMode.CURRENT_STATE,
     "single-session-assistant": QueryMode.CURRENT_STATE,
+    "single-session-preference": QueryMode.CURRENT_STATE,
     "multi-session": QueryMode.CURRENT_STATE,
     "temporal-reasoning": QueryMode.HISTORY,
     "knowledge-update": QueryMode.CURRENT_STATE,
@@ -112,6 +113,7 @@ def _convert_record(item: dict, index: int) -> BenchmarkBatch:
             if session_idx < len(haystack_session_ids)
             else ""
         )
+        scope = source_session_id or f"session_{session_idx}"
         for turn in session:
             role = turn.get("role", "unknown")
             content = str(turn.get("content", ""))
@@ -124,11 +126,13 @@ def _convert_record(item: dict, index: int) -> BenchmarkBatch:
                 value=content,
                 timestamp=turn_counter,
                 session_id=qid,
+                scope=scope,
                 confidence=1.0,
                 metadata={
                     "source_date": source_date,
                     "session_label": source_session_id,
                     "speaker": str(role),
+                    "has_answer": str(bool(turn.get("has_answer", False))).lower(),
                 },
                 provenance=f"longmemeval_raw_s{session_idx}",
             ))
@@ -136,10 +140,12 @@ def _convert_record(item: dict, index: int) -> BenchmarkBatch:
 
     query_mode = _QUESTION_TYPE_TO_MODE.get(question_type, QueryMode.CURRENT_STATE)
     multi_attrs = tuple(item.get("multi_attributes", []) or [])
+    query_entity = _query_entity_for_question_type(question_type)
+    supports_abstention = qid.endswith("_abs")
 
     query = Query(
         query_id=qid,
-        entity="user",
+        entity=query_entity,
         attribute="dialogue",
         question=str(item["question"]),
         answer=str(item["answer"]),
@@ -147,7 +153,7 @@ def _convert_record(item: dict, index: int) -> BenchmarkBatch:
         session_id=qid,
         multi_attributes=multi_attrs,
         query_mode=query_mode,
-        supports_abstention=False,
+        supports_abstention=supports_abstention,
     )
 
     return BenchmarkBatch(session_id=qid, updates=updates, queries=[query])
@@ -171,3 +177,9 @@ def _coerce_turn_groups(raw_sessions: object) -> List[List[dict]]:
             normalized.append(session)
         return normalized
     raise ValueError("haystack_sessions must contain turn dicts or lists of turn dicts")
+
+
+def _query_entity_for_question_type(question_type: str) -> str:
+    if question_type == "single-session-assistant":
+        return "assistant"
+    return "user"

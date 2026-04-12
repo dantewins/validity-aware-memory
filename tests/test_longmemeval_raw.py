@@ -35,6 +35,19 @@ FIXTURE = [
         ],
         "answer_session_ids": ["sess_1"],
     },
+    {
+        "question_id": "q_003_abs",
+        "question_type": "single-session-assistant",
+        "question": "What did the assistant suggest?",
+        "answer": "Try yoga",
+        "haystack_dates": ["2024-01-21"],
+        "haystack_session_ids": ["sess_3"],
+        "haystack_sessions": [[
+            {"role": "user", "content": "How do I relax more?"},
+            {"role": "assistant", "content": "Try yoga.", "has_answer": True},
+        ]],
+        "answer_session_ids": ["sess_3"],
+    },
 ]
 
 
@@ -49,7 +62,7 @@ class TestLoadRawLongMemEval:
     def test_basic_loading(self):
         path = _write_fixture()
         batches = load_raw_longmemeval(path)
-        assert len(batches) == 2
+        assert len(batches) == 3
 
     def test_updates_from_sessions(self):
         path = _write_fixture()
@@ -72,6 +85,18 @@ class TestLoadRawLongMemEval:
         q = batches[1].queries[0]
         assert q.query_mode == QueryMode.HISTORY
 
+    def test_assistant_question_targets_assistant_entity(self):
+        path = _write_fixture()
+        batches = load_raw_longmemeval(path)
+        q = batches[2].queries[0]
+        assert q.entity == "assistant"
+
+    def test_abstention_suffix_sets_supports_abstention(self):
+        path = _write_fixture()
+        batches = load_raw_longmemeval(path)
+        q = batches[2].queries[0]
+        assert q.supports_abstention is True
+
     def test_limit(self):
         path = _write_fixture()
         batches = load_raw_longmemeval(path, limit=1)
@@ -82,9 +107,9 @@ class TestPreprocessRawLongMemEval:
     def test_integrity_stats(self):
         path = _write_fixture()
         dataset = preprocess_raw_longmemeval(path)
-        assert dataset.total_sessions == 2
-        assert dataset.total_queries == 2
-        assert dataset.total_updates == 5  # 3 + 2 turns
+        assert dataset.total_sessions == 3
+        assert dataset.total_queries == 3
+        assert dataset.total_updates == 7  # 3 + 2 + 2 turns
         assert dataset.dropped_records == 0
         assert dataset.source_dataset == "longmemeval"
 
@@ -115,3 +140,4 @@ class TestPreprocessRawLongMemEval:
         batches = load_raw_longmemeval(tmp.name)
         assert batches[0].updates[0].metadata["source_date"] == "2024-01-20"
         assert batches[0].updates[0].metadata["session_label"] == "sess_1"
+        assert batches[0].updates[0].scope == "sess_1"

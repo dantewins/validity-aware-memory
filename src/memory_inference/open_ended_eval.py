@@ -62,10 +62,16 @@ def lexical_retrieval(
     *,
     top_k: int = 8,
     policy_name: str = "",
+    secondary_score_fn=None,
 ) -> RetrievalResult:
+    entry_list = list(entries)
+    if query.entity and query.entity not in {"conversation", "all"}:
+        entity_matches = [entry for entry in entry_list if entry.entity == query.entity]
+        if entity_matches:
+            entry_list = entity_matches
     ranked = sorted(
-        entries,
-        key=lambda entry: _score_entry(entry, query),
+        entry_list,
+        key=lambda entry: _combined_score(entry, query, secondary_score_fn),
         reverse=True,
     )
     unique: list[MemoryEntry] = []
@@ -84,6 +90,10 @@ def lexical_retrieval(
             "retrieval_mode": "lexical_open_ended",
         },
     )
+
+
+def lexical_score(entry: MemoryEntry, query: Query) -> tuple[float, ...]:
+    return _score_entry(entry, query)
 
 
 def answers_match(prediction: str, gold: str) -> bool:
@@ -143,6 +153,16 @@ def _score_entry(entry: MemoryEntry, query: Query) -> tuple[float, ...]:
         entry.confidence,
         float(entry.timestamp),
     )
+
+
+def _combined_score(entry: MemoryEntry, query: Query, secondary_score_fn) -> tuple[float, ...]:
+    primary = _score_entry(entry, query)
+    if secondary_score_fn is None:
+        return primary
+    secondary = secondary_score_fn(entry)
+    if isinstance(secondary, tuple):
+        return primary + secondary
+    return primary + (secondary,)
 
 
 def _content_tokens(text: str) -> set[str]:

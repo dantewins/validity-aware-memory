@@ -37,7 +37,7 @@ def build_reasoning_prompt(
     )
     if query.supports_abstention or query.query_mode == QueryMode.CONFLICT_AWARE:
         user_prompt += (
-            f"If the latest evidence is unresolved or contradictory, answer exactly {ABSTAIN_TOKEN}.\n"
+            f"If the memory does not contain enough evidence to answer, answer exactly {ABSTAIN_TOKEN}.\n"
         )
     prompt = f"System: {system_prompt}\nUser:\n{user_prompt}"
     return PromptPackage(

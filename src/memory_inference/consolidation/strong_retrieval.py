@@ -28,7 +28,13 @@ class StrongRetrievalMemoryPolicy(BaseMemoryPolicy):
 
     def retrieve_for_query(self, query: Query, top_k: int = 5) -> RetrievalResult:
         if is_open_ended_query(query):
-            return lexical_retrieval(self.entries, query, top_k=max(top_k, 8), policy_name=self.name)
+            return lexical_retrieval(
+                self.entries,
+                query,
+                top_k=max(top_k, 8),
+                policy_name=self.name,
+                secondary_score_fn=lambda entry: self._score(entry, query.entity, query.attribute),
+            )
         return self.retrieve(query.entity, query.attribute, top_k=top_k)
 
     def snapshot_size(self) -> int:

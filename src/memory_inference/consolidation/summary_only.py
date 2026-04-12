@@ -32,6 +32,7 @@ class SummaryOnlyMemoryPolicy(BaseMemoryPolicy):
                 query,
                 top_k=max(top_k, 8),
                 policy_name=self.name,
+                secondary_score_fn=lambda entry: (float(entry.timestamp),),
             )
         return self.retrieve(query.entity, query.attribute, top_k=top_k)
 

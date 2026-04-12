@@ -206,16 +206,50 @@ class OfflineDeltaConsolidationPolicyV2(BaseMemoryPolicy):
 
     def retrieve_for_query(self, query: Query, top_k: int = 5) -> RetrievalResult:
         if is_open_ended_query(query):
-            candidates: List[MemoryEntry] = list(self.episodic_log)
-            if not candidates:
-                candidates.extend(self._current_entries(query.entity, query.attribute))
+            candidates = self._open_ended_candidates(query)
             return lexical_retrieval(
                 candidates,
                 query,
                 top_k=max(top_k, 8),
                 policy_name=self.name,
+                secondary_score_fn=self._open_ended_secondary_score,
             )
         return self.retrieve_by_mode(query)
+
+    def _open_ended_candidates(self, query: Query) -> List[MemoryEntry]:
+        if query.query_mode == QueryMode.HISTORY:
+            return [entry for entry in self.episodic_log if entry.attribute == query.attribute]
+        if query.query_mode == QueryMode.STATE_WITH_PROVENANCE:
+            return self._current_entries(query.entity, query.attribute) + list(
+                self.archive.get((query.entity, query.attribute), [])
+            )
+        if query.query_mode == QueryMode.CONFLICT_AWARE:
+            return (
+                list(self.conflict_table.get((query.entity, query.attribute), []))
+                + self._current_entries(query.entity, query.attribute)
+            )
+        current = self._current_entries(query.entity, query.attribute)
+        if current:
+            return current
+        archived = list(self.archive.get((query.entity, query.attribute), []))
+        if archived:
+            return archived
+        return [entry for entry in self.episodic_log if entry.attribute == query.attribute]
+
+    def _open_ended_secondary_score(self, entry: MemoryEntry) -> tuple[float, ...]:
+        status_bonus = {
+            MemoryStatus.ACTIVE: 1.0,
+            MemoryStatus.REINFORCED: 0.9,
+            MemoryStatus.CONFLICTED: 0.4,
+            MemoryStatus.SUPERSEDED: 0.2,
+            MemoryStatus.ARCHIVED: 0.1,
+        }.get(entry.status, 0.0)
+        return (
+            status_bonus,
+            entry.importance,
+            entry.confidence,
+            float(entry.timestamp),
+        )
 
     def _current_entries(self, entity: str, attribute: str) -> List[MemoryEntry]:
         return [
