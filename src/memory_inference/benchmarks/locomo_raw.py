@@ -155,6 +155,7 @@ def _convert_sample(item: dict, index: int) -> List[BenchmarkBatch]:
                 value=text,
                 timestamp=ts_counter,
                 session_id=f"{sample_id}-{sess_key}",
+                scope=sess_key,
                 confidence=confidence,
                 importance=importance,
                 metadata={

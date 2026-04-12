@@ -117,6 +117,7 @@ class TestLoadRawLoCoMo:
         batches = load_raw_locomo(path)
         dialogues = [u for u in batches[0].updates if u.provenance == "locomo_dialogue"]
         assert dialogues[0].metadata["source_date"] == "2024-01-10"
+        assert dialogues[0].scope == "session_1"
 
     def test_limit(self):
         path = _write_fixture()
