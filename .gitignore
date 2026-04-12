@@ -1,0 +1,8 @@
+/.claude
+.DS_Store
+.pytest_cache/
+__pycache__/
+.cache/
+*.pyc
+headroom_memory.db
+docs/superpowers

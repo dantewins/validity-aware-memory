@@ -1,0 +1,189 @@
+from __future__ import annotations
+
+import re
+import time
+from typing import Any, Optional, Sequence
+
+from memory_inference.llm.base import BaseReasoner, ReasonerTrace
+from memory_inference.llm.cache import ResponseCache, cache_key
+from memory_inference.llm.local_config import LocalModelConfig
+from memory_inference.llm.prompting import build_reasoning_prompt, render_prompt
+from memory_inference.types import MemoryEntry, Query
+
+
+class LocalHFReasoner(BaseReasoner):
+    """Local Hugging Face reasoner for real frozen-model experiments."""
+
+    def __init__(self, config: LocalModelConfig) -> None:
+        self.config = config
+        self._tokenizer: Any = None
+        self._model: Any = None
+        self._torch: Any = None
+        self._cache = ResponseCache(config.cache_dir) if config.cache_dir is not None else None
+
+    def answer(self, query: Query, context: Sequence[MemoryEntry]) -> str:
+        return self.answer_with_trace(query, context).answer
+
+    def answer_with_trace(self, query: Query, context: Sequence[MemoryEntry]) -> ReasonerTrace:
+        package = build_reasoning_prompt(
+            query,
+            context,
+            template_id=self.config.prompt_template_id,
+            system_prompt=self.config.system_prompt,
+        )
+        self._ensure_loaded()
+        rendered_prompt = render_prompt(
+            package,
+            tokenizer=self._tokenizer,
+            use_chat_template=self.config.use_chat_template,
+        )
+        cache_key_value = cache_key(
+            self.config.model_id,
+            package.template_id,
+            rendered_prompt,
+            str(self.config.max_new_tokens),
+            str(self.config.temperature),
+            str(self.config.top_p),
+            str(self.config.do_sample),
+            str(self.config.repetition_penalty),
+        )
+        if self._cache is not None:
+            cached = self._cache.load(cache_key_value)
+            if cached is not None:
+                cached.cache_hit = True
+                return cached
+
+        started = time.perf_counter()
+        encoded = self._tokenizer(
+            rendered_prompt,
+            return_tensors="pt",
+            truncation=True,
+            max_length=self.config.context_window,
+        )
+        prompt_tokens = int(encoded["input_ids"].shape[-1])
+        if hasattr(encoded, "to"):
+            encoded = encoded.to(self._model.device)
+        generated = self._model.generate(
+            **encoded,
+            **self._generate_kwargs(),
+        )
+        generated_ids = generated[0]
+        completion_ids = generated_ids[prompt_tokens:]
+        completion_text = self._decode_completion(completion_ids)
+        answer_text = self._extract_answer(completion_text, rendered_prompt)
+        completion_tokens = self._token_length(completion_ids)
+        latency_ms = (time.perf_counter() - started) * 1000.0
+        trace = ReasonerTrace(
+            answer=answer_text,
+            model_id=self.config.model_id,
+            prompt=rendered_prompt,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
+            latency_ms=latency_ms,
+            cache_hit=False,
+            raw_output=completion_text,
+            metadata={
+                "backend": self.config.backend,
+                "template_id": package.template_id,
+                "use_chat_template": str(self.config.use_chat_template),
+            },
+        )
+        if self._cache is not None:
+            self._cache.save(cache_key_value, trace)
+        return trace
+
+    def _ensure_loaded(self) -> None:
+        if self._model is not None and self._tokenizer is not None:
+            return
+        try:
+            import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+        except ImportError as exc:
+            raise ImportError(
+                "LocalHFReasoner requires `transformers` and `torch` to be installed."
+            ) from exc
+
+        self._torch = torch
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self.config.model_id,
+            trust_remote_code=self.config.trust_remote_code,
+        )
+        if self._tokenizer.pad_token_id is None and self._tokenizer.eos_token_id is not None:
+            self._tokenizer.pad_token_id = self._tokenizer.eos_token_id
+        self._model = AutoModelForCausalLM.from_pretrained(
+            self.config.model_id,
+            trust_remote_code=self.config.trust_remote_code,
+            **self._model_load_kwargs(torch),
+        )
+        if self.config.device != "auto":
+            self._model = self._model.to(self.config.device)
+        self._configure_generation_defaults()
+        self._model.eval()
+
+    def _decode_completion(self, completion_ids: Any) -> str:
+        return self._tokenizer.decode(completion_ids, skip_special_tokens=True)
+
+    def _token_length(self, token_ids: Any) -> int:
+        shape = getattr(token_ids, "shape", None)
+        if shape is not None:
+            return int(shape[-1])
+        return len(token_ids)
+
+    def _model_load_kwargs(self, torch: Any) -> dict[str, Any]:
+        model_kwargs: dict[str, Any] = {}
+        if self.config.device == "auto":
+            model_kwargs["device_map"] = "auto"
+        if self.config.dtype != "auto":
+            model_kwargs["dtype"] = getattr(torch, self.config.dtype)
+        return model_kwargs
+
+    def _generate_kwargs(self) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {
+            "max_new_tokens": self.config.max_new_tokens,
+            "do_sample": self.config.do_sample,
+            "repetition_penalty": self.config.repetition_penalty,
+            "pad_token_id": getattr(self._tokenizer, "eos_token_id", None),
+        }
+        if self.config.do_sample:
+            kwargs["temperature"] = self.config.temperature
+            kwargs["top_p"] = self.config.top_p
+        return kwargs
+
+    def _configure_generation_defaults(self) -> None:
+        generation_config = getattr(self._model, "generation_config", None)
+        if generation_config is None:
+            return
+        generation_config.do_sample = self.config.do_sample
+        generation_config.max_new_tokens = self.config.max_new_tokens
+        generation_config.repetition_penalty = self.config.repetition_penalty
+        if self.config.do_sample:
+            generation_config.temperature = self.config.temperature
+            generation_config.top_p = self.config.top_p
+            return
+        if hasattr(generation_config, "temperature"):
+            generation_config.temperature = 1.0
+        if hasattr(generation_config, "top_p"):
+            generation_config.top_p = 1.0
+        if hasattr(generation_config, "top_k"):
+            generation_config.top_k = 50
+
+    def _extract_answer(self, generated_text: str, prompt: str) -> str:
+        if generated_text.startswith(prompt):
+            generated_text = generated_text[len(prompt):]
+        cleaned = generated_text.strip()
+        if not cleaned:
+            return "UNKNOWN"
+        cleaned = re.sub(r"^```[a-zA-Z0-9_-]*", "", cleaned).strip()
+        cleaned = cleaned.removesuffix("```").strip()
+        lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+        if not lines:
+            return "UNKNOWN"
+        first_line = lines[0]
+        if first_line.lower() == "assistant":
+            first_line = lines[1] if len(lines) > 1 else "UNKNOWN"
+        first_line = re.sub(r"^(assistant)\s*:?\s*", "", first_line, flags=re.IGNORECASE).strip()
+        if "ABSTAIN" in first_line:
+            return "ABSTAIN"
+        first_line = re.sub(r"^(Answer:|Response:|Final answer:)\s*", "", first_line, flags=re.IGNORECASE)
+        return first_line.strip(" \"'`") or "UNKNOWN"

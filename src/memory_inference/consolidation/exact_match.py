@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+from typing import Dict, Iterable, Tuple
+
+from memory_inference.consolidation.base import BaseMemoryPolicy
+from memory_inference.types import MemoryEntry, RetrievalResult
+
+
+class ExactMatchMemoryPolicy(BaseMemoryPolicy):
+    """Symbolic baseline that only keeps the latest exact key+scope entry."""
+
+    def __init__(self) -> None:
+        super().__init__(name="exact_match")
+        self.current: Dict[Tuple[str, str, str], MemoryEntry] = {}
+
+    def ingest(self, updates: Iterable[MemoryEntry]) -> None:
+        for update in updates:
+            key = (update.entity, update.attribute, update.scope)
+            existing = self.current.get(key)
+            if existing is None or update.timestamp >= existing.timestamp:
+                self.current[key] = update
+
+    def retrieve(self, entity: str, attribute: str, top_k: int = 5) -> RetrievalResult:
+        entries = [
+            entry
+            for (stored_entity, stored_attribute, _scope), entry in self.current.items()
+            if stored_entity == entity and stored_attribute == attribute
+        ]
+        entries.sort(key=lambda item: (item.timestamp, item.scope), reverse=True)
+        return RetrievalResult(entries=entries[:top_k], debug={"policy": self.name})
+
+    def snapshot_size(self) -> int:
+        return len(self.current)

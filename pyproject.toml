@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memory-inference-research"
+version = "0.1.0"
+description = "Validity-aware external memory research for frozen long-horizon LLM agents"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+local-hf = [
+    "torch>=2.2",
+    "transformers>=4.40",
+]
+
+[project.scripts]
+memory-inference = "memory_inference.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
