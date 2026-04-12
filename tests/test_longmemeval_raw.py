@@ -163,3 +163,26 @@ class TestPreprocessRawLongMemEval:
         tmp.close()
         batches = load_raw_longmemeval(tmp.name)
         assert batches[0].queries[0].attribute == "dialogue"
+
+    def test_structured_facts_include_support_metadata_and_event_scope(self):
+        fixture = [{
+            "question_id": "q_playlist",
+            "question": "What is the name of the playlist I created on Spotify?",
+            "answer": "Summer Vibes",
+            "haystack_dates": ["2024-01-20"],
+            "haystack_session_ids": ["sess_1"],
+            "haystack_sessions": [[
+                {"role": "user", "content": "I created a playlist on Spotify called Summer Vibes."},
+            ]],
+        }]
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+        json.dump(fixture, tmp)
+        tmp.close()
+        batches = load_raw_longmemeval(tmp.name)
+        facts = [u for u in batches[0].updates if u.attribute == "created_name"]
+
+        assert facts
+        assert facts[0].metadata["source_kind"] == "structured_fact"
+        assert facts[0].metadata["source_attribute"] == "dialogue"
+        assert facts[0].metadata["support_text"] == "I created a playlist on Spotify called Summer Vibes."
+        assert facts[0].scope.startswith("sess_1:turn_0:fact_")

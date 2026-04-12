@@ -26,6 +26,8 @@ from memory_inference.types import BenchmarkBatch, MemoryEntry, Query
 
 logger = logging.getLogger(__name__)
 
+_SUPPORT_TEXT_LIMIT = 160
+
 _QUESTION_TYPE_TO_MODE = {
     "single-session-user": QueryMode.CURRENT_STATE,
     "single-session-assistant": QueryMode.CURRENT_STATE,
@@ -146,6 +148,7 @@ def _convert_record(item: dict, index: int) -> BenchmarkBatch:
                 provenance=source_provenance,
             ))
             for fact_idx, fact in enumerate(extract_structured_facts(content)):
+                fact_scope = scope if fact.is_stateful else f"{scope}:turn_{turn_counter}:fact_{fact_idx}"
                 updates.append(MemoryEntry(
                     entry_id=f"{qid}-turn-{turn_counter}-fact-{fact_idx}",
                     entity=str(role),
@@ -153,7 +156,7 @@ def _convert_record(item: dict, index: int) -> BenchmarkBatch:
                     value=fact.value,
                     timestamp=turn_counter,
                     session_id=qid,
-                    scope=scope,
+                    scope=fact_scope,
                     confidence=min(1.0, confidence + 0.08),
                     importance=min(1.8, importance + 0.15),
                     metadata={
@@ -161,6 +164,10 @@ def _convert_record(item: dict, index: int) -> BenchmarkBatch:
                         "session_label": source_session_id,
                         "speaker": str(role),
                         "source_kind": "structured_fact",
+                        "source_attribute": "dialogue",
+                        "source_entry_id": f"{qid}-turn-{turn_counter}",
+                        "support_text": _support_text(content),
+                        "memory_kind": "state" if fact.is_stateful else "event",
                     },
                     provenance=f"{source_provenance}_fact",
                 ))
@@ -217,3 +224,10 @@ def _query_entity_for_question_type(question_type: str) -> str:
     if question_type == "single-session-assistant":
         return "assistant"
     return "user"
+
+
+def _support_text(text: str) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= _SUPPORT_TEXT_LIMIT:
+        return compact
+    return compact[: _SUPPORT_TEXT_LIMIT - 3].rstrip() + "..."

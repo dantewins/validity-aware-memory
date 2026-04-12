@@ -95,10 +95,20 @@ def _format_metadata(entry: MemoryEntry) -> str:
     if not entry.metadata:
         return ""
     visible_items = []
-    for key in ("source_date", "session_label", "session_id", "speaker"):
+    for key in ("source_date", "session_label", "session_id", "speaker", "source_kind", "memory_kind"):
         value = entry.metadata.get(key)
         if value:
             visible_items.append(f"{key}={value}")
+    support_text = entry.metadata.get("support_text")
+    if support_text:
+        visible_items.append(f"support={_compact_support_text(support_text)}")
     if not visible_items:
         return ""
     return "; " + "; ".join(visible_items)
+
+
+def _compact_support_text(text: str, *, limit: int = 140) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 3].rstrip() + "..."

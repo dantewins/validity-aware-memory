@@ -126,6 +126,49 @@ def shortlist_open_ended_candidates(
     return unique
 
 
+def has_structured_fact_candidates(entries: Iterable[MemoryEntry]) -> bool:
+    return any(entry.metadata.get("source_kind") == "structured_fact" for entry in entries)
+
+
+def rerank_structured_candidates(
+    entries: Iterable[MemoryEntry],
+    query: Query,
+    *,
+    top_k: int,
+    policy_name: str,
+    score_fn: Callable[[MemoryEntry], tuple[float, ...] | float],
+    support_entries: Iterable[MemoryEntry],
+    shortlist_limit: int,
+    support_limit: int = 2,
+) -> RetrievalResult:
+    shortlisted = shortlist_open_ended_candidates(
+        entries,
+        query,
+        score_fn=score_fn,
+        limit=shortlist_limit,
+    )
+    base = lexical_retrieval(
+        shortlisted,
+        query,
+        top_k=top_k,
+        policy_name=policy_name,
+        secondary_score_fn=score_fn,
+    )
+    expanded = expand_with_support_entries(
+        base.entries,
+        support_entries,
+        support_limit=support_limit,
+        max_entries=top_k + support_limit,
+    )
+    return RetrievalResult(
+        entries=expanded,
+        debug={
+            **base.debug,
+            "retrieval_mode": "structured_fact_rerank",
+        },
+    )
+
+
 def lexical_score(entry: MemoryEntry, query: Query) -> tuple[float, ...]:
     return _score_entry(entry, query)
 
@@ -208,3 +251,39 @@ def _coerce_score_key(score: tuple[float, ...] | float) -> tuple[float, ...]:
     if isinstance(score, tuple):
         return score
     return (float(score),)
+
+
+def expand_with_support_entries(
+    entries: Sequence[MemoryEntry],
+    support_entries: Iterable[MemoryEntry],
+    *,
+    support_limit: int = 2,
+    max_entries: int | None = None,
+) -> list[MemoryEntry]:
+    result: list[MemoryEntry] = []
+    seen_ids: set[str] = set()
+    support_by_id = {entry.entry_id: entry for entry in support_entries}
+
+    for entry in entries:
+        if entry.entry_id in seen_ids:
+            continue
+        seen_ids.add(entry.entry_id)
+        result.append(entry)
+
+    supports_added = 0
+    for entry in entries:
+        source_entry_id = entry.metadata.get("source_entry_id")
+        if not source_entry_id:
+            continue
+        support = support_by_id.get(source_entry_id)
+        if support is None or support.entry_id in seen_ids:
+            continue
+        seen_ids.add(support.entry_id)
+        result.append(support)
+        supports_added += 1
+        if supports_added >= support_limit:
+            break
+
+    if max_entries is not None:
+        return result[:max_entries]
+    return result

@@ -136,6 +136,35 @@ class TestLoadRawLoCoMo:
         followup = next(batch for batch in batches if batch.queries[0].question == "Where did Caroline move from?")
         assert followup.queries[0].attribute == "origin"
 
+    def test_non_temporal_unstructured_locomo_questions_default_to_event(self):
+        fixture = [
+            {
+                "sample_id": "sample_event_fallback",
+                "conversation": {
+                    "session_1": [
+                        {"dia_id": 0, "speaker": "Caroline", "text": "I visited the science museum with friends."},
+                    ],
+                    "session_1_date_time": "2024-03-01",
+                },
+                "event_summary": {
+                    "Caroline": ["Visited the science museum with friends"],
+                },
+                "qa": [
+                    {
+                        "question": "What did Caroline do with friends?",
+                        "answer": "Visited the science museum",
+                        "category": 1,
+                    },
+                ],
+            }
+        ]
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+        json.dump(fixture, tmp)
+        tmp.close()
+        batches = load_raw_locomo(tmp.name)
+
+        assert batches[0].queries[0].attribute == "event"
+
 
 class TestPreprocessRawLoCoMo:
     def test_integrity_stats(self):

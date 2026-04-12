@@ -77,6 +77,37 @@ def test_prompt_includes_source_metadata() -> None:
     assert "session_label=session_1" in prompt.user_prompt
 
 
+def test_prompt_includes_structured_fact_support_text() -> None:
+    query = Query(
+        query_id="q-support",
+        entity="user",
+        attribute="created_name",
+        question="What is the name of the playlist I created on Spotify?",
+        answer="Summer Vibes",
+        timestamp=0,
+        session_id="s",
+    )
+    prompt = build_reasoning_prompt(
+        query,
+        [
+            MemoryEntry(
+                entry_id="1",
+                entity="user",
+                attribute="created_name",
+                value="Summer Vibes",
+                timestamp=0,
+                session_id="s",
+                metadata={
+                    "source_kind": "structured_fact",
+                    "support_text": "I created a playlist on Spotify called Summer Vibes.",
+                },
+            )
+        ],
+    )
+    assert "source_kind=structured_fact" in prompt.user_prompt
+    assert "support=I created a playlist on Spotify called Summer Vibes." in prompt.user_prompt
+
+
 def test_offline_delta_open_ended_retrieval_prefers_current_scoped_entries() -> None:
     policy = OfflineDeltaConsolidationPolicyV2(consolidator=MockConsolidator())
     policy.ingest(
@@ -254,3 +285,67 @@ def test_policy_shortlist_keeps_salient_older_open_ended_evidence() -> None:
 
     assert "Business Administration" not in append_top
     assert "Business Administration" in recency_top
+
+
+def test_append_only_reranks_structured_fact_queries_with_support_text() -> None:
+    policy = AppendOnlyMemoryPolicy()
+    policy.ingest(
+        [
+            MemoryEntry(
+                entry_id="support-target",
+                entity="user",
+                attribute="dialogue",
+                value="I redeemed a $5 coupon on coffee creamer at Target.",
+                timestamp=0,
+                session_id="s",
+            ),
+            MemoryEntry(
+                entry_id="fact-target",
+                entity="user",
+                attribute="venue",
+                value="Target",
+                timestamp=0,
+                session_id="s",
+                metadata={
+                    "source_kind": "structured_fact",
+                    "source_entry_id": "support-target",
+                    "support_text": "I redeemed a $5 coupon on coffee creamer at Target.",
+                },
+            ),
+            MemoryEntry(
+                entry_id="support-other",
+                entity="user",
+                attribute="dialogue",
+                value="I bought bread at Trader Joe's.",
+                timestamp=5,
+                session_id="s",
+            ),
+            MemoryEntry(
+                entry_id="fact-other",
+                entity="user",
+                attribute="venue",
+                value="Trader Joe's",
+                timestamp=5,
+                session_id="s",
+                metadata={
+                    "source_kind": "structured_fact",
+                    "source_entry_id": "support-other",
+                    "support_text": "I bought bread at Trader Joe's.",
+                },
+            ),
+        ]
+    )
+    query = Query(
+        query_id="q-venue",
+        entity="user",
+        attribute="venue",
+        question="Where did I redeem a $5 coupon on coffee creamer?",
+        answer="Target",
+        timestamp=6,
+        session_id="s",
+    )
+
+    retrieved = policy.retrieve_for_query(query)
+
+    assert retrieved.entries[0].value == "Target"
+    assert any(entry.entry_id == "support-target" for entry in retrieved.entries)

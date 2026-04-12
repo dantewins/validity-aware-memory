@@ -4,8 +4,10 @@ from typing import Dict, Iterable, Tuple
 
 from memory_inference.consolidation.base import BaseMemoryPolicy
 from memory_inference.open_ended_eval import (
+    has_structured_fact_candidates,
     is_open_ended_query,
     lexical_retrieval,
+    rerank_structured_candidates,
     shortlist_open_ended_candidates,
 )
 from memory_inference.types import MemoryEntry, RetrievalResult
@@ -49,6 +51,21 @@ class ExactMatchMemoryPolicy(BaseMemoryPolicy):
                 top_k=max(top_k, 8),
                 policy_name=self.name,
                 secondary_score_fn=lambda entry: (float(entry.timestamp),),
+            )
+        candidates = [
+            entry for entry in self.current.values()
+            if entry.attribute == query.attribute
+        ]
+        if has_structured_fact_candidates(candidates):
+            return rerank_structured_candidates(
+                candidates,
+                query,
+                top_k=top_k,
+                policy_name=self.name,
+                score_fn=lambda entry: (float(entry.timestamp),),
+                support_entries=self.current.values(),
+                shortlist_limit=max(top_k * 8, 32),
+                support_limit=1,
             )
         return self.retrieve(query.entity, query.attribute, top_k=top_k)
 

@@ -26,6 +26,8 @@ from memory_inference.types import BenchmarkBatch, MemoryEntry, Query
 
 logger = logging.getLogger(__name__)
 
+_SUPPORT_TEXT_LIMIT = 160
+
 _CATEGORY_TO_MODE = {
     "single-hop": QueryMode.CURRENT_STATE,
     "multi-hop": QueryMode.CURRENT_STATE,
@@ -136,6 +138,7 @@ def _convert_sample(item: dict, index: int) -> List[BenchmarkBatch]:
                 provenance="locomo_event_summary",
             ))
             for fact_idx, fact in enumerate(extract_structured_facts(event_text_str)):
+                fact_scope = "default" if fact.is_stateful else f"event_{ts_counter}:fact_{fact_idx}"
                 updates.append(MemoryEntry(
                     entry_id=f"{sample_id}-evt-{ts_counter}-fact-{fact_idx}",
                     entity=str(speaker),
@@ -143,11 +146,16 @@ def _convert_sample(item: dict, index: int) -> List[BenchmarkBatch]:
                     value=fact.value,
                     timestamp=ts_counter,
                     session_id=sample_id,
+                    scope=fact_scope,
                     confidence=min(1.0, event_confidence + 0.08),
                     importance=min(1.8, event_importance + 0.15),
                     metadata={
                         "speaker": str(speaker),
                         "source_kind": "structured_fact",
+                        "source_attribute": "event",
+                        "source_entry_id": f"{sample_id}-evt-{ts_counter}",
+                        "support_text": _support_text(event_text_str),
+                        "memory_kind": "state" if fact.is_stateful else "event",
                     },
                     provenance="locomo_event_summary_fact",
                 ))
@@ -189,14 +197,16 @@ def _convert_sample(item: dict, index: int) -> List[BenchmarkBatch]:
                 provenance=source_provenance,
             ))
             for fact_idx, fact in enumerate(extract_structured_facts(text)):
+                source_entry_id = f"{sample_id}-{sess_key}-{turn.get('dia_id', ts_counter)}"
+                fact_scope = sess_key if fact.is_stateful else f"{sess_key}:turn_{ts_counter}:fact_{fact_idx}"
                 updates.append(MemoryEntry(
-                    entry_id=f"{sample_id}-{sess_key}-{turn.get('dia_id', ts_counter)}-fact-{fact_idx}",
+                    entry_id=f"{source_entry_id}-fact-{fact_idx}",
                     entity=speaker,
                     attribute=fact.attribute,
                     value=fact.value,
                     timestamp=ts_counter,
                     session_id=f"{sample_id}-{sess_key}",
-                    scope=sess_key,
+                    scope=fact_scope,
                     confidence=min(1.0, confidence + 0.08),
                     importance=min(1.8, importance + 0.15),
                     metadata={
@@ -204,6 +214,10 @@ def _convert_sample(item: dict, index: int) -> List[BenchmarkBatch]:
                         "session_label": sess_key,
                         "speaker": speaker,
                         "source_kind": "structured_fact",
+                        "source_attribute": "dialogue",
+                        "source_entry_id": source_entry_id,
+                        "support_text": _support_text(text),
+                        "memory_kind": "state" if fact.is_stateful else "event",
                     },
                     provenance=f"{source_provenance}_fact",
                 ))
@@ -226,11 +240,12 @@ def _convert_sample(item: dict, index: int) -> List[BenchmarkBatch]:
                 if isinstance(turn, dict)
             },
         )
+        fallback_attribute = "dialogue" if query_mode == QueryMode.HISTORY else "event"
         query_attribute = choose_query_attribute(
             str(qa["question"]),
             query_entity,
             updates,
-            fallback="dialogue",
+            fallback=fallback_attribute,
         )
         query = Query(
             query_id=f"{sample_id}-q{qa_idx}",
@@ -283,3 +298,10 @@ def _infer_query_entity(question: str, speakers: set[str]) -> str:
     if len(matches) == 1:
         return matches[0]
     return "conversation"
+
+
+def _support_text(text: str) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= _SUPPORT_TEXT_LIMIT:
+        return compact
+    return compact[: _SUPPORT_TEXT_LIMIT - 3].rstrip() + "..."
