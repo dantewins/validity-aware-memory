@@ -41,6 +41,31 @@ FIXTURE = [
             },
         ],
     },
+    {
+        "sample_id": "sample_002",
+        "conversation": {
+            "session_1": [
+                {"dia_id": 0, "speaker": "Caroline", "text": "I moved from Sweden four years ago."},
+            ],
+            "session_1_date_time": "2024-03-01",
+        },
+        "event_summary": {
+            "Caroline": ["Moved from Sweden four years ago"],
+        },
+        "qa": [
+            {
+                "question": "Where did Caroline move from?",
+                "answer": "Sweden",
+                "category": 1,
+                "evidence": ["D1:1"],
+            },
+            {
+                "question": "Would Caroline be likely to own a spaceship?",
+                "category": 5,
+                "evidence": [],
+            },
+        ],
+    },
 ]
 
 
@@ -55,8 +80,8 @@ class TestLoadRawLoCoMo:
     def test_basic_loading(self):
         path = _write_fixture()
         batches = load_raw_locomo(path)
-        # 2 QA pairs -> 2 batches
-        assert len(batches) == 2
+        # 2 scored QA pairs in sample_001 + 1 scored QA in sample_002
+        assert len(batches) == 3
 
     def test_event_summary_entries(self):
         path = _write_fixture()
@@ -99,12 +124,19 @@ class TestLoadRawLoCoMo:
         # limit=1 limits samples, not batches, but 1 sample -> 2 QA -> 2 batches
         assert len(batches) == 2
 
+    def test_missing_answer_adversarial_question_is_skipped(self):
+        path = _write_fixture()
+        batches = load_raw_locomo(path)
+        questions = [batch.queries[0].question for batch in batches]
+        assert "Would Caroline be likely to own a spaceship?" not in questions
+        assert "Where did Caroline move from?" in questions
+
 
 class TestPreprocessRawLoCoMo:
     def test_integrity_stats(self):
         path = _write_fixture()
         dataset = preprocess_raw_locomo(path)
         assert dataset.source_dataset == "locomo"
-        assert dataset.total_queries == 2
+        assert dataset.total_queries == 3
         assert dataset.dropped_records == 0
         assert dataset.total_updates > 0

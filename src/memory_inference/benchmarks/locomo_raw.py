@@ -30,6 +30,8 @@ _CATEGORY_TO_MODE = {
     "1": QueryMode.CURRENT_STATE,
     "2": QueryMode.HISTORY,
     "3": QueryMode.CURRENT_STATE,
+    "4": QueryMode.CURRENT_STATE,
+    "5": QueryMode.CONFLICT_AWARE,
 }
 
 
@@ -162,6 +164,9 @@ def _convert_sample(item: dict, index: int) -> List[BenchmarkBatch]:
     batches: List[BenchmarkBatch] = []
     for qa_idx, qa in enumerate(qa_list):
         category = _normalize_category(qa.get("category", ""))
+        answer = qa.get("answer")
+        if _should_skip_qa(category, answer):
+            continue
         query_mode = _CATEGORY_TO_MODE.get(category, QueryMode.CURRENT_STATE)
         query_entity = _infer_query_entity(
             str(qa.get("question", "")),
@@ -177,11 +182,11 @@ def _convert_sample(item: dict, index: int) -> List[BenchmarkBatch]:
             entity=query_entity,
             attribute="dialogue",
             question=str(qa["question"]),
-            answer=str(qa["answer"]),
+            answer=str(answer),
             timestamp=ts_counter,
             session_id=sample_id,
             query_mode=query_mode,
-            supports_abstention=(category == "adversarial"),
+            supports_abstention=(category in {"adversarial", "5"}),
         )
         batches.append(BenchmarkBatch(
             session_id=f"{sample_id}-q{qa_idx}",
@@ -190,12 +195,7 @@ def _convert_sample(item: dict, index: int) -> List[BenchmarkBatch]:
         ))
 
     if not batches:
-        # No QA pairs -- return updates-only batch
-        batches.append(BenchmarkBatch(
-            session_id=sample_id,
-            updates=updates,
-            queries=[],
-        ))
+        return []
 
     return batches
 
@@ -210,6 +210,12 @@ def _count_sessions(item: dict) -> int:
 
 def _normalize_category(raw_category: object) -> str:
     return str(raw_category).strip().lower()
+
+
+def _should_skip_qa(category: str, answer: object) -> bool:
+    if answer is not None and str(answer).strip():
+        return False
+    return category in {"5", "adversarial"}
 
 
 def _infer_query_entity(question: str, speakers: set[str]) -> str:
