@@ -167,12 +167,6 @@ def rerank_structured_candidates(
             "retrieval_mode": "structured_fact_rerank",
         },
     )
-
-
-def lexical_score(entry: MemoryEntry, query: Query) -> tuple[float, ...]:
-    return _score_entry(entry, query)
-
-
 def answers_match(prediction: str, gold: str) -> bool:
     normalized_prediction = normalize_answer(prediction)
     normalized_gold = normalize_answer(gold)

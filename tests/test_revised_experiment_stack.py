@@ -26,6 +26,29 @@ def test_agent_uses_query_mode_aware_retrieval_for_conflicts() -> None:
     assert results[0].prediction == ABSTAIN_TOKEN
 
 
+def test_deterministic_reader_returns_oldest_value_for_history_queries() -> None:
+    scenario = next(
+        scenario
+        for scenario in build_revision_benchmark(RevisionBenchmarkConfig(entities=1))
+        if scenario.scenario_id.startswith("S3")
+    )
+    query = scenario.batch.queries[0]
+    query.query_mode = QueryMode.HISTORY
+    query.answer = next(
+        entry.value
+        for entry in scenario.batch.updates
+        if entry.entity == query.entity and entry.attribute == query.attribute
+    )
+    runner = AgentRunner(
+        policy=AppendOnlyMemoryPolicy(),
+        reasoner=DeterministicValidityReader(),
+    )
+
+    results = runner.run_batches([scenario.batch])
+
+    assert results[0].prediction == query.answer
+
+
 def test_exact_match_policy_preserves_multiple_scopes() -> None:
     scenario = next(
         scenario

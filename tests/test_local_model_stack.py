@@ -10,6 +10,7 @@ from memory_inference.cli import main as cli_main
 from memory_inference.experiment_registry import policy_factory_by_name
 from memory_inference.llm.base import BaseReasoner
 from memory_inference.llm.cache import ResponseCache, cache_key
+from memory_inference.llm.fixed_prompt_reader import FixedPromptReader
 from memory_inference.llm.local_config import LocalModelConfig
 from memory_inference.llm.local_hf_reasoner import LocalHFReasoner
 from memory_inference.llm.prompting import build_reasoning_prompt, render_prompt
@@ -204,6 +205,11 @@ def test_local_hf_reasoner_resets_sampling_defaults_for_greedy_generation() -> N
     assert config.temperature == 1.0
     assert config.top_p == 1.0
     assert config.top_k == 50
+
+
+def test_fixed_prompt_reader_preserves_configured_prompt_template() -> None:
+    reader = FixedPromptReader(prompt_template="Use only memory.")
+    assert reader.prompt_template == "Use only memory."
 
 
 def test_preprocess_longmemeval_writes_cached_json(tmp_path) -> None:

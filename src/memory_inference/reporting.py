@@ -177,6 +177,8 @@ def _latex_policy_name(name: str) -> str:
         "summary_only": "Summary-only",
         "exact_match": "Exact-match",
         "strong_retrieval": "Strong retr.",
+        "dense_retrieval": "Dense retr.",
+        "mem0": "Mem0",
         "offline_delta_v2": "ODV2 (full)",
         "odv2_hybrid": "ODV2 + retr.",
         "odv2_no_revert": r"$-$Revert",

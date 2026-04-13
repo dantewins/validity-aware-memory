@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Reproducible commands for the paper draft.
+# Reproducible commands for the final paper runs.
 # Run from the repository root on a machine with the project venv activated.
+# These commands assume the cleaned LongMemEval and official LoCoMo JSON files
+# are available under data/.
 
 export PYTHONPATH=src
 export HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET:-1}"
@@ -12,30 +14,34 @@ python -m memory_inference.cli synthetic \
   --model-id Qwen/Qwen2.5-7B-Instruct \
   --device cuda \
   --dtype bfloat16 \
-  --output results/synthetic_qwen25_7b_all.json
+  --output results/synthetic_qwen25_7b_final.json
 
-python -m memory_inference.cli synthetic \
+# Download benchmark inputs if needed:
+#   curl -L https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json -o data/longmemeval_s_cleaned.json
+#   curl -L https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json -o data/locomo10.json
+
+python -m memory_inference.cli longmemeval \
+  --input data/longmemeval_s_cleaned.json \
+  --input-format raw \
   --reasoner local-hf \
-  --model-id Qwen/Qwen2.5-3B-Instruct \
+  --model-id Qwen/Qwen2.5-7B-Instruct \
   --device cuda \
   --dtype bfloat16 \
-  --output results/synthetic_qwen25_3b_all.json
+  --policy strong_retrieval \
+  --policy offline_delta_v2 \
+  --policy odv2_hybrid \
+  --cache-dir .cache/memory_inference_longmemeval_final \
+  --output results/longmemeval_qwen25_7b_final.json
 
-# Real-data commands require pre-structured benchmark JSON and are not runnable
-# from a fresh clone of the repository because those inputs are not bundled.
-#
-# python -m memory_inference.cli longmemeval \
-#   --input data/longmemeval_structured.json \
-#   --reasoner local-hf \
-#   --model-id Qwen/Qwen2.5-7B-Instruct \
-#   --device cuda \
-#   --dtype bfloat16 \
-#   --output results/longmemeval_qwen25_7b.json
-#
-# python -m memory_inference.cli locomo \
-#   --input data/locomo_structured.json \
-#   --reasoner local-hf \
-#   --model-id Qwen/Qwen2.5-7B-Instruct \
-#   --device cuda \
-#   --dtype bfloat16 \
-#   --output results/locomo_qwen25_7b.json
+python -m memory_inference.cli locomo \
+  --input data/locomo10.json \
+  --input-format raw \
+  --reasoner local-hf \
+  --model-id Qwen/Qwen2.5-7B-Instruct \
+  --device cuda \
+  --dtype bfloat16 \
+  --policy strong_retrieval \
+  --policy offline_delta_v2 \
+  --policy odv2_hybrid \
+  --cache-dir .cache/memory_inference_locomo_final \
+  --output results/locomo_qwen25_7b_final.json

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable, Sequence
+from typing import Callable
 
 from memory_inference.benchmarks.revision_synthetic import RevisionBenchmarkConfig, build_revision_benchmark
 from memory_inference.consolidation.append_only import AppendOnlyMemoryPolicy
 from memory_inference.consolidation.base import BaseMemoryPolicy
+from memory_inference.consolidation.dense_retrieval import DenseRetrievalMemoryPolicy
 from memory_inference.consolidation.exact_match import ExactMatchMemoryPolicy
+from memory_inference.consolidation.mem0 import Mem0MemoryPolicy
 from memory_inference.consolidation.offline_delta_v2 import OfflineDeltaConsolidationPolicyV2
 from memory_inference.consolidation.odv2_hybrid import ODV2HybridMemoryPolicy
 from memory_inference.consolidation.recency_salience import RecencySalienceMemoryPolicy
@@ -31,6 +32,8 @@ def default_policy_factories() -> list[PolicyFactory]:
         SummaryOnlyMemoryPolicy,
         ExactMatchMemoryPolicy,
         StrongRetrievalMemoryPolicy,
+        DenseRetrievalMemoryPolicy,
+        Mem0MemoryPolicy,
         lambda: OfflineDeltaConsolidationPolicyV2(consolidator=MockConsolidator()),
         lambda: ODV2HybridMemoryPolicy(consolidator=MockConsolidator()),
     ]
@@ -69,6 +72,8 @@ def policy_factory_by_name(name: str) -> PolicyFactory:
         "summary_only": SummaryOnlyMemoryPolicy,
         "exact_match": ExactMatchMemoryPolicy,
         "strong_retrieval": StrongRetrievalMemoryPolicy,
+        "dense_retrieval": DenseRetrievalMemoryPolicy,
+        "mem0": Mem0MemoryPolicy,
         "offline_delta_v2": lambda: OfflineDeltaConsolidationPolicyV2(consolidator=MockConsolidator()),
         "odv2_hybrid": lambda: ODV2HybridMemoryPolicy(consolidator=MockConsolidator()),
     }
@@ -77,26 +82,5 @@ def policy_factory_by_name(name: str) -> PolicyFactory:
     if name not in lookup:
         raise KeyError(f"Unknown policy preset: {name}")
     return lookup[name]
-
-
-@dataclass(slots=True)
-class ExperimentPreset:
-    name: str
-    description: str
-
-
-def default_presets() -> list[ExperimentPreset]:
-    return [
-        ExperimentPreset(
-            name="synthetic_revision",
-            description="Structured synthetic validity-maintenance benchmark with oracle state labels.",
-        ),
-        ExperimentPreset(
-            name="longmemeval",
-            description="LongMemEval evaluation using the canonical raw or normalized benchmark pipeline.",
-        ),
-    ]
-
-
 def build_synthetic_batches():
     return build_revision_benchmark(RevisionBenchmarkConfig())
