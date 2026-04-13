@@ -178,6 +178,7 @@ def _latex_policy_name(name: str) -> str:
         "exact_match": "Exact-match",
         "strong_retrieval": "Strong retr.",
         "offline_delta_v2": "ODV2 (full)",
+        "odv2_hybrid": "ODV2 + retr.",
         "odv2_no_revert": r"$-$Revert",
         "odv2_no_conflict": r"$-$Conflict",
         "odv2_no_scope": r"$-$Scope",

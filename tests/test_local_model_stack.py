@@ -284,6 +284,11 @@ def test_policy_registry_returns_expected_factory() -> None:
     assert policy.name == "offline_delta_v2"
 
 
+def test_policy_registry_returns_hybrid_factory() -> None:
+    policy = policy_factory_by_name("odv2_hybrid")()
+    assert policy.name == "odv2_hybrid"
+
+
 def test_build_manifest_adds_timestamp() -> None:
     manifest = build_manifest(
         benchmark="synthetic_revision",

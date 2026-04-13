@@ -8,6 +8,7 @@ from memory_inference.consolidation.append_only import AppendOnlyMemoryPolicy
 from memory_inference.consolidation.base import BaseMemoryPolicy
 from memory_inference.consolidation.exact_match import ExactMatchMemoryPolicy
 from memory_inference.consolidation.offline_delta_v2 import OfflineDeltaConsolidationPolicyV2
+from memory_inference.consolidation.odv2_hybrid import ODV2HybridMemoryPolicy
 from memory_inference.consolidation.recency_salience import RecencySalienceMemoryPolicy
 from memory_inference.consolidation.strong_retrieval import StrongRetrievalMemoryPolicy
 from memory_inference.consolidation.summary_only import SummaryOnlyMemoryPolicy
@@ -31,6 +32,7 @@ def default_policy_factories() -> list[PolicyFactory]:
         ExactMatchMemoryPolicy,
         StrongRetrievalMemoryPolicy,
         lambda: OfflineDeltaConsolidationPolicyV2(consolidator=MockConsolidator()),
+        lambda: ODV2HybridMemoryPolicy(consolidator=MockConsolidator()),
     ]
 
 
@@ -68,6 +70,7 @@ def policy_factory_by_name(name: str) -> PolicyFactory:
         "exact_match": ExactMatchMemoryPolicy,
         "strong_retrieval": StrongRetrievalMemoryPolicy,
         "offline_delta_v2": lambda: OfflineDeltaConsolidationPolicyV2(consolidator=MockConsolidator()),
+        "odv2_hybrid": lambda: ODV2HybridMemoryPolicy(consolidator=MockConsolidator()),
     }
     for abl_name, consolidator_cls in _ABLATION_NAMES.items():
         lookup[abl_name] = (lambda n, cls: lambda: _named_odv2(n, cls()))(abl_name, consolidator_cls)
