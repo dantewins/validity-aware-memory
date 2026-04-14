@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 from typing import Any, Protocol, Sequence
 
 from memory_inference.types import MemoryEntry, Query
@@ -101,6 +102,7 @@ class TransformerDenseEncoder:
         try:
             import torch
             from transformers import AutoModel, AutoTokenizer
+            from transformers.utils import logging as transformers_logging
         except ImportError as exc:
             raise ImportError(
                 "TransformerDenseEncoder requires `transformers` and `torch` to be installed."
@@ -110,7 +112,24 @@ class TransformerDenseEncoder:
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         if self._tokenizer.pad_token_id is None and self._tokenizer.eos_token_id is not None:
             self._tokenizer.pad_token_id = self._tokenizer.eos_token_id
-        self._model = AutoModel.from_pretrained(self.model_id)
+        previous_verbosity = transformers_logging.get_verbosity()
+        try:
+            transformers_logging.set_verbosity_error()
+            loaded = AutoModel.from_pretrained(
+                self.model_id,
+                output_loading_info=True,
+            )
+        except TypeError:
+            loaded = AutoModel.from_pretrained(self.model_id)
+            loading_info: dict[str, Any] = {}
+        finally:
+            transformers_logging.set_verbosity(previous_verbosity)
+        if isinstance(loaded, tuple):
+            self._model, loading_info = loaded
+        else:
+            self._model = loaded
+            loading_info = {}
+        self._handle_loading_info(loading_info)
         self._device = self._resolve_device(torch)
         self._model = self._model.to(self._device)
         self._model.eval()
@@ -186,3 +205,26 @@ class TransformerDenseEncoder:
 
     def _format_passage(self, text: str) -> str:
         return f"passage: {text}"
+
+    def _handle_loading_info(self, loading_info: dict[str, Any]) -> None:
+        benign_unexpected = {"embeddings.position_ids"}
+        unexpected = [
+            key
+            for key in loading_info.get("unexpected_keys", [])
+            if key not in benign_unexpected
+        ]
+        missing = list(loading_info.get("missing_keys", []))
+        mismatched = list(loading_info.get("mismatched_keys", []))
+        errors = [message for message in loading_info.get("error_msgs", []) if message]
+
+        if mismatched or errors:
+            raise RuntimeError(
+                f"Unexpected dense encoder load issues for {self.model_id}: "
+                f"mismatched={mismatched!r} errors={errors!r}"
+            )
+        if missing or unexpected:
+            warnings.warn(
+                f"Dense encoder load for {self.model_id} reported "
+                f"missing={missing!r} unexpected={unexpected!r}.",
+                stacklevel=2,
+            )
