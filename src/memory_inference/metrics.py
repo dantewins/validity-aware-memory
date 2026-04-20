@@ -19,6 +19,7 @@ class ExperimentMetrics:
     avg_retrieved_items: float
     avg_retrieved_chars: float
     avg_context_tokens: float
+    avg_prompt_tokens: float
     avg_completion_tokens: float
     avg_snapshot_size: float
     maintenance_tokens: int
@@ -53,12 +54,11 @@ def compute_metrics(
     avg_prompt_tokens = (
         sum(row.prompt_tokens for row in rows) / total if total else 0.0
     )
-    fallback_context_tokens = (
+    avg_context_tokens = (
         sum(sum(_token_count(entry.text()) for entry in row.retrieved) for row in rows) / total
         if total
         else 0.0
     )
-    avg_context_tokens = avg_prompt_tokens if avg_prompt_tokens > 0 else fallback_context_tokens
     avg_completion_tokens = (
         sum(row.completion_tokens for row in rows) / total if total else 0.0
     )
@@ -84,12 +84,15 @@ def compute_metrics(
         avg_retrieved_items=avg_items,
         avg_retrieved_chars=avg_chars,
         avg_context_tokens=avg_context_tokens,
+        avg_prompt_tokens=avg_prompt_tokens,
         avg_completion_tokens=avg_completion_tokens,
         avg_snapshot_size=avg_snapshot_size,
         maintenance_tokens=maintenance_tokens,
         maintenance_latency_ms=maintenance_latency_ms,
         amortized_end_to_end_tokens=(
-            avg_context_tokens + avg_completion_tokens + (maintenance_tokens / total if total else 0.0)
+            (avg_prompt_tokens if avg_prompt_tokens > 0 else avg_context_tokens)
+            + avg_completion_tokens
+            + (maintenance_tokens / total if total else 0.0)
         ),
         avg_query_latency_ms=avg_query_latency_ms,
         cache_hit_rate=cache_hit_rate,

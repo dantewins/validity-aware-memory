@@ -9,7 +9,10 @@ from memory_inference.types import MemoryEntry, Query
 
 def test_answers_match_normalizes_short_span_predictions() -> None:
     assert answers_match("Business Administration.", "Business Administration")
-    assert answers_match("She graduated with Business Administration", "Business Administration")
+    assert not answers_match(
+        "She graduated with Business Administration",
+        "Business Administration",
+    )
     assert not answers_match("Psychology", "Business Administration")
 
 

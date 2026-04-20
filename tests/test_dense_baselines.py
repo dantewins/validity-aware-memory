@@ -223,6 +223,77 @@ def test_mem0_delete_removes_matching_active_memory() -> None:
     assert not [entry for entry in policy.active_store.values() if entry.attribute == "home_city"]
 
 
+def test_mem0_updates_same_key_even_when_dense_neighbor_window_misses_it() -> None:
+    class SkewedEncoder:
+        def encode_query(self, text: str) -> tuple[float, ...]:
+            return self._encode(text)
+
+        def encode_passage(self, text: str) -> tuple[float, ...]:
+            return self._encode(text)
+
+        def encode_passages(self, texts) -> list[tuple[float, ...]]:
+            return [self._encode(text) for text in texts]
+
+        def similarity(self, left, right) -> float:
+            return sum(left_value * right_value for left_value, right_value in zip(left, right))
+
+        def _encode(self, text: str) -> tuple[float, ...]:
+            lower = text.lower()
+            if "seattle" in lower:
+                return (1.0, 0.0)
+            if "boston" in lower:
+                return (0.0, 1.0)
+            if "distractor" in lower:
+                return (10.0, 0.0)
+            return (0.0, 0.0)
+
+    policy = Mem0MemoryPolicy(encoder=SkewedEncoder(), write_top_k=2)
+    updates = [
+        MemoryEntry(
+            entry_id="old",
+            entity="user",
+            attribute="home_city",
+            value="Boston",
+            timestamp=1,
+            session_id="s",
+            metadata={"memory_kind": "state"},
+        )
+    ]
+    updates.extend(
+        MemoryEntry(
+            entry_id=f"d{idx}",
+            entity=f"other{idx}",
+            attribute=f"other{idx}",
+            value=f"distractor {idx}",
+            timestamp=idx + 2,
+            session_id="s",
+            metadata={"memory_kind": "event"},
+        )
+        for idx in range(5)
+    )
+    updates.append(
+        MemoryEntry(
+            entry_id="new",
+            entity="user",
+            attribute="home_city",
+            value="Seattle",
+            timestamp=10,
+            session_id="s",
+            metadata={"memory_kind": "state"},
+        )
+    )
+
+    policy.ingest(updates)
+
+    active_values = [
+        entry.value
+        for entry in policy.active_store.values()
+        if entry.entity == "user" and entry.attribute == "home_city"
+    ]
+
+    assert active_values == ["Seattle"]
+
+
 def test_policy_registry_returns_dense_and_mem0_factories() -> None:
     dense = policy_factory_by_name("dense_retrieval")()
     mem0 = policy_factory_by_name("mem0")()

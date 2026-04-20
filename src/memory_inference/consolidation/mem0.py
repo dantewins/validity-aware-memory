@@ -74,9 +74,13 @@ class Mem0MemoryPolicy(BaseMemoryPolicy):
         return len(self.active_store)
 
     def _apply_write(self, update: MemoryEntry, neighbors: Sequence[MemoryEntry]) -> None:
+        # Same-key consolidation must consider the full active store. Restricting
+        # this check to a dense top-k neighbor window can leave contradictory
+        # active states alive when the encoder undershoots or unrelated entries
+        # outrank the prior value.
         same_key = [
             entry
-            for entry in neighbors
+            for entry in self.active_store.values()
             if entry.entity == update.entity and entry.attribute == update.attribute
         ]
         duplicate = next(

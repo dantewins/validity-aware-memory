@@ -89,6 +89,7 @@ class TestLoadRawLongMemEval:
         batches = load_raw_longmemeval(path)
         q = batches[1].queries[0]
         assert q.query_mode == QueryMode.HISTORY
+        assert q.timestamp == 2
 
     def test_assistant_question_targets_assistant_entity(self):
         path = _write_fixture()

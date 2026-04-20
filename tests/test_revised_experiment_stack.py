@@ -90,8 +90,8 @@ def test_structured_evaluation_resets_policy_state_per_batch() -> None:
                 MemoryEntry(
                     entry_id="u1",
                     entity="user",
-                    attribute="dialogue",
-                    value="I live in Boston.",
+                    attribute="home_city",
+                    value="Boston",
                     timestamp=0,
                     session_id="batch-1",
                 )
@@ -100,7 +100,7 @@ def test_structured_evaluation_resets_policy_state_per_batch() -> None:
                 Query(
                     query_id="q1",
                     entity="user",
-                    attribute="dialogue",
+                    attribute="home_city",
                     question="Where do I live?",
                     answer="Boston",
                     timestamp=1,
@@ -114,8 +114,8 @@ def test_structured_evaluation_resets_policy_state_per_batch() -> None:
                 MemoryEntry(
                     entry_id="u2",
                     entity="user",
-                    attribute="dialogue",
-                    value="I live in Seattle.",
+                    attribute="home_city",
+                    value="Seattle",
                     timestamp=0,
                     session_id="batch-2",
                 )
@@ -124,7 +124,7 @@ def test_structured_evaluation_resets_policy_state_per_batch() -> None:
                 Query(
                     query_id="q2",
                     entity="user",
-                    attribute="dialogue",
+                    attribute="home_city",
                     question="Where do I live?",
                     answer="Seattle",
                     timestamp=1,

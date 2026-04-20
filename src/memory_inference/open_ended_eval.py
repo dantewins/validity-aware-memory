@@ -170,15 +170,9 @@ def rerank_structured_candidates(
 def answers_match(prediction: str, gold: str) -> bool:
     normalized_prediction = normalize_answer(prediction)
     normalized_gold = normalize_answer(gold)
-    if normalized_prediction == normalized_gold:
-        return True
     if not normalized_prediction or not normalized_gold:
         return False
-    if _contains_as_span(normalized_prediction, normalized_gold):
-        return True
-    if _contains_as_span(normalized_gold, normalized_prediction):
-        return True
-    return False
+    return normalized_prediction == normalized_gold
 
 
 def normalize_answer(text: str) -> str:
@@ -188,10 +182,6 @@ def normalize_answer(text: str) -> str:
     normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
     normalized = re.sub(r"\s+", " ", normalized)
     return normalized.strip()
-
-
-def _contains_as_span(container: str, span: str) -> bool:
-    return bool(re.search(rf"(^|\s){re.escape(span)}($|\s)", container))
 
 
 def _score_entry(entry: MemoryEntry, query: Query) -> tuple[float, ...]:

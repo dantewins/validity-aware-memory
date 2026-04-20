@@ -190,7 +190,7 @@ def _convert_record(item: dict, index: int) -> BenchmarkBatch:
         attribute=query_attribute,
         question=str(item["question"]),
         answer=str(item["answer"]),
-        timestamp=len(sessions),
+        timestamp=turn_counter,
         session_id=qid,
         multi_attributes=multi_attrs,
         query_mode=query_mode,
