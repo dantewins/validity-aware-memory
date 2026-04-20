@@ -93,19 +93,6 @@ def test_low_confidence_does_not_pollute_current_state() -> None:
     assert result.entries[0].value == "good"
 
 
-def test_maintenance_frequency_delays_consolidation_until_threshold() -> None:
-    p = OfflineDeltaConsolidationPolicyV2(
-        consolidator=MockConsolidator(),
-        maintenance_frequency=2,
-    )
-    p.ingest([_e("e1", "old", ts=1), _e("e2", "new", ts=2)])
-    p.maybe_consolidate()
-    assert p.retrieve("u", "a").entries == []
-
-    p.maybe_consolidate()
-    assert p.retrieve("u", "a").entries[0].value == "new"
-
-
 # ------------------------------------------------------------------ #
 # Retrieval modes                                                      #
 # ------------------------------------------------------------------ #

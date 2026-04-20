@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import re
 import time
 from typing import Any, Optional, Sequence
@@ -105,6 +106,7 @@ class LocalHFReasoner(BaseReasoner):
             ) from exc
 
         self._torch = torch
+        self._configure_torch_runtime(torch)
         self._tokenizer = AutoTokenizer.from_pretrained(
             self.config.model_id,
             trust_remote_code=self.config.trust_remote_code,
@@ -135,8 +137,36 @@ class LocalHFReasoner(BaseReasoner):
         if self.config.device == "auto":
             model_kwargs["device_map"] = "auto"
         if self.config.dtype != "auto":
-            model_kwargs["dtype"] = getattr(torch, self.config.dtype)
+            model_kwargs["torch_dtype"] = getattr(torch, self.config.dtype)
+        attention_impl = self._attention_implementation(torch)
+        if attention_impl is not None:
+            model_kwargs["attn_implementation"] = attention_impl
         return model_kwargs
+
+    def _configure_torch_runtime(self, torch: Any) -> None:
+        if not self._using_cuda(torch):
+            return
+        if hasattr(torch, "set_float32_matmul_precision"):
+            torch.set_float32_matmul_precision("high")
+        cuda_backend = getattr(getattr(torch, "backends", None), "cuda", None)
+        if cuda_backend is not None and hasattr(cuda_backend, "matmul"):
+            cuda_backend.matmul.allow_tf32 = True
+        cudnn_backend = getattr(getattr(torch, "backends", None), "cudnn", None)
+        if cudnn_backend is not None and hasattr(cudnn_backend, "allow_tf32"):
+            cudnn_backend.allow_tf32 = True
+
+    def _attention_implementation(self, torch: Any) -> str | None:
+        if not self._using_cuda(torch):
+            return None
+        if importlib.util.find_spec("flash_attn") is not None:
+            return "flash_attention_2"
+        return "sdpa"
+
+    def _using_cuda(self, torch: Any) -> bool:
+        if isinstance(self.config.device, str) and self.config.device.startswith("cuda"):
+            return True
+        cuda = getattr(torch, "cuda", None)
+        return bool(cuda is not None and cuda.is_available())
 
     def _generate_kwargs(self) -> dict[str, Any]:
         kwargs: dict[str, Any] = {

@@ -8,6 +8,8 @@ set -euo pipefail
 
 export PYTHONPATH=src
 export HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET:-1}"
+export HF_ENABLE_PARALLEL_LOADING="${HF_ENABLE_PARALLEL_LOADING:-true}"
+export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
 # Download benchmark inputs if needed:
 #   curl -L https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json -o data/longmemeval_s_cleaned.json

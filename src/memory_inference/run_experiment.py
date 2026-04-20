@@ -34,16 +34,29 @@ def evaluate_structured_policy_full(
     maintenance_tokens = 0
     maintenance_latency_ms = 0.0
     policy_name = "unknown"
+    cached_signature: tuple | None = None
+    cached_runner: AgentRunner | None = None
+    cached_policy: BaseMemoryPolicy | None = None
 
     for batch in batches:
-        policy = policy_factory()
-        policy_name = policy.name
-        runner = AgentRunner(policy=policy, reasoner=reasoner)
-        batch_examples = runner.run_batches([batch])
+        signature = _updates_signature(batch)
+        if signature != cached_signature or cached_runner is None or cached_policy is None:
+            policy = policy_factory()
+            policy_name = policy.name
+            runner = AgentRunner(policy=policy, reasoner=reasoner)
+            runner.ingest_updates(batch.updates)
+            cached_signature = signature
+            cached_runner = runner
+            cached_policy = policy
+            maintenance_tokens += policy.maintenance_tokens
+            maintenance_latency_ms += policy.maintenance_latency_ms
+        else:
+            runner = cached_runner
+            policy = cached_policy
+            policy_name = policy.name
+        batch_examples = runner.answer_queries(batch.queries)
         examples.extend(batch_examples)
         snapshot_sizes.append(policy.snapshot_size())
-        maintenance_tokens += policy.maintenance_tokens
-        maintenance_latency_ms += policy.maintenance_latency_ms
 
     metrics = compute_metrics(
         policy_name,
@@ -53,3 +66,25 @@ def evaluate_structured_policy_full(
         maintenance_latency_ms=maintenance_latency_ms,
     )
     return ExperimentResult(metrics=metrics, examples=examples)
+
+
+def _updates_signature(batch: BenchmarkBatch) -> tuple:
+    return tuple(
+        (
+            entry.entry_id,
+            entry.entity,
+            entry.attribute,
+            entry.value,
+            entry.timestamp,
+            entry.session_id,
+            entry.confidence,
+            entry.importance,
+            entry.access_count,
+            entry.status.name,
+            entry.scope,
+            entry.supersedes_id,
+            entry.provenance,
+            tuple(sorted(entry.metadata.items())),
+        )
+        for entry in batch.updates
+    )

@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import List, Optional, Set
 
+from memory_inference.consolidation.consolidation_types import UpdateType
 from memory_inference.consolidation.revision_types import RevisionOp
 from memory_inference.types import MemoryEntry
 
@@ -17,12 +18,33 @@ class BaseConsolidator(ABC):
     def __init__(self) -> None:
         self.total_calls: int = 0
 
+    # ------------------------------------------------------------------ #
+    # Legacy interface (UpdateType) — kept for backward compatibility      #
+    # ------------------------------------------------------------------ #
+
+    @abstractmethod
+    def classify_update(self, new_entry: MemoryEntry, existing: MemoryEntry) -> UpdateType:
+        """Classify how new_entry relates to existing for the same key."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def merge_entries(self, entries: List[MemoryEntry]) -> MemoryEntry:
+        """Merge multiple reinforcement entries into one canonical entry.
+
+        entries must be non-empty.
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def extract_facts(
         self, text: str, entity: str, session_id: str, timestamp: int
     ) -> List[MemoryEntry]:
         """Extract structured MemoryEntry objects from a raw text turn."""
         raise NotImplementedError
+
+    # ------------------------------------------------------------------ #
+    # Validity-state interface (RevisionOp) — Phase 1 extensions           #
+    # ------------------------------------------------------------------ #
 
     @abstractmethod
     def classify_revision(

@@ -18,29 +18,37 @@ class AgentRunner:
     def run_batches(self, batches: Iterable[BenchmarkBatch]) -> List[InferenceExample]:
         results: List[InferenceExample] = []
         for batch in batches:
-            self.policy.ingest(batch.updates)
-            self.policy.maybe_consolidate()
-            for query in batch.queries:
-                retrieved = self._retrieve(query)
-                trace = self.reasoner.answer_with_trace(query, retrieved)
-                prediction = trace.answer
-                if query.multi_attributes:
-                    prediction = self._format_multihop(prediction, query, retrieved)
-                results.append(
-                    InferenceExample(
-                        query=query,
-                        retrieved=list(retrieved),
-                        prediction=prediction,
-                        correct=answers_match(prediction, query.answer),
-                        policy_name=self.policy.name,
-                        prompt_tokens=trace.prompt_tokens,
-                        completion_tokens=trace.completion_tokens,
-                        total_tokens=trace.total_tokens,
-                        latency_ms=trace.latency_ms,
-                        cache_hit=trace.cache_hit,
-                        reasoner_name=trace.model_id,
-                    )
+            self.ingest_updates(batch.updates)
+            results.extend(self.answer_queries(batch.queries))
+        return results
+
+    def ingest_updates(self, updates: Iterable[MemoryEntry]) -> None:
+        self.policy.ingest(updates)
+        self.policy.maybe_consolidate()
+
+    def answer_queries(self, queries: Iterable[Query]) -> List[InferenceExample]:
+        results: List[InferenceExample] = []
+        for query in queries:
+            retrieved = self._retrieve(query)
+            trace = self.reasoner.answer_with_trace(query, retrieved)
+            prediction = trace.answer
+            if query.multi_attributes:
+                prediction = self._format_multihop(prediction, query, retrieved)
+            results.append(
+                InferenceExample(
+                    query=query,
+                    retrieved=list(retrieved),
+                    prediction=prediction,
+                    correct=answers_match(prediction, query.answer),
+                    policy_name=self.policy.name,
+                    prompt_tokens=trace.prompt_tokens,
+                    completion_tokens=trace.completion_tokens,
+                    total_tokens=trace.total_tokens,
+                    latency_ms=trace.latency_ms,
+                    cache_hit=trace.cache_hit,
+                    reasoner_name=trace.model_id,
                 )
+            )
         return results
 
     def _retrieve(

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from typing import List, Optional, Set
 
+from memory_inference.consolidation.consolidation_types import UpdateType
 from memory_inference.consolidation.revision_types import RevisionOp
 from memory_inference.llm.consolidator_base import BaseConsolidator
 from memory_inference.types import MemoryEntry
@@ -16,6 +18,24 @@ class MockConsolidator(BaseConsolidator):
     def __init__(self, low_confidence_threshold: float = _DEFAULT_LOW_CONF) -> None:
         super().__init__()
         self.low_confidence_threshold = low_confidence_threshold
+
+    def classify_update(self, new_entry: MemoryEntry, existing: MemoryEntry) -> UpdateType:
+        self.total_calls += 1
+        if new_entry.value == existing.value:
+            return UpdateType.REINFORCEMENT
+        if new_entry.timestamp > existing.timestamp:
+            return UpdateType.SUPERSESSION
+        return UpdateType.CONFLICT  # equal or older timestamps with different values
+
+    def merge_entries(self, entries: List[MemoryEntry]) -> MemoryEntry:
+        self.total_calls += 1
+        best = max(entries, key=lambda e: e.confidence)
+        merged_value = " | ".join(sorted({e.value for e in entries}))
+        return dataclasses.replace(
+            best,
+            value=merged_value,
+            confidence=min(1.0, best.confidence + 0.1),
+        )
 
     def extract_facts(
         self, text: str, entity: str, session_id: str, timestamp: int
@@ -62,11 +82,11 @@ class MockConsolidator(BaseConsolidator):
         """
         self.total_calls += 1
 
-        if new_entry.confidence < self.low_confidence_threshold:
-            return RevisionOp.LOW_CONFIDENCE
-
         if existing is None:
             return RevisionOp.ADD
+
+        if new_entry.confidence < self.low_confidence_threshold:
+            return RevisionOp.LOW_CONFIDENCE
 
         if new_entry.scope != existing.scope:
             return RevisionOp.SPLIT_SCOPE
