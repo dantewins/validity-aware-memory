@@ -201,6 +201,137 @@ def test_odv2_dense_history_query_surfaces_prior_and_current_values() -> None:
     assert "Meta" in returned_values
 
 
+def test_odv2_dense_uses_soft_entity_matching_when_query_entity_is_wrong() -> None:
+    p = _dense_policy()
+    support = make_record(
+        entry_id="turn-assistant",
+        entity="assistant",
+        attribute="dialogue",
+        value="I started working at Google.",
+        timestamp=1,
+        session_id="s",
+        scope="session_1",
+    )
+    fact = make_record(
+        entry_id="fact-assistant-google",
+        entity="assistant",
+        attribute="employer",
+        value="Google",
+        timestamp=1,
+        session_id="s",
+        scope="session_1",
+        metadata={
+            "source_kind": "structured_fact",
+            "source_entry_id": "turn-assistant",
+            "support_text": "I started working at Google.",
+            "memory_kind": "state",
+        },
+    )
+    p.ingest([support, fact])
+    p.maybe_consolidate()
+
+    result = p.retrieve_for_query(
+        make_query(
+            query_id="q-cross-entity",
+            entity="user",
+            attribute="employer",
+            question="Where does the assistant work now?",
+            answer="Google",
+            timestamp=2,
+            session_id="s",
+            query_mode=QueryMode.CURRENT_STATE,
+        )
+    )
+
+    assert any(entry.entry_id == "fact-assistant-google" for entry in result.entries)
+    assert any(entry.entry_id == "turn-assistant" for entry in result.entries)
+
+
+def test_odv2_strong_fallback_does_not_drop_cross_entity_raw_evidence() -> None:
+    p = _strong_policy()
+    support = make_record(
+        entry_id="turn-assistant",
+        entity="assistant",
+        attribute="dialogue",
+        value="The venue was Cafe Luna.",
+        timestamp=1,
+        session_id="s",
+        scope="session_1",
+    )
+    p.ingest([support])
+    p.maybe_consolidate()
+
+    result = p.retrieve_for_query(
+        make_query(
+            query_id="q-raw-cross-entity",
+            entity="user",
+            attribute="dialogue",
+            question="Which venue was Cafe Luna?",
+            answer="Cafe Luna",
+            timestamp=2,
+            session_id="s",
+            query_mode=QueryMode.CURRENT_STATE,
+        )
+    )
+
+    assert any(entry.entry_id == "turn-assistant" for entry in result.entries)
+
+
+def test_odv2_dense_evidence_lane_prefers_semantic_match_over_wrong_anchor() -> None:
+    p = _dense_policy()
+    wrong_support = make_record(
+        entry_id="turn-meta",
+        entity="Alice",
+        attribute="dialogue",
+        value="I started working at Meta.",
+        timestamp=1,
+        session_id="s",
+        scope="session_1",
+    )
+    wrong_fact = make_record(
+        entry_id="fact-meta",
+        entity="Alice",
+        attribute="employer",
+        value="Meta",
+        timestamp=1,
+        session_id="s",
+        scope="session_1",
+        metadata={
+            "source_kind": "structured_fact",
+            "source_entry_id": "turn-meta",
+            "support_text": "I started working at Meta.",
+            "memory_kind": "state",
+        },
+    )
+    correct_raw = make_record(
+        entry_id="turn-google",
+        entity="Alice",
+        attribute="dialogue",
+        value="The correct employer is Google.",
+        timestamp=2,
+        session_id="s",
+        scope="session_2",
+    )
+    p.ingest([wrong_support, wrong_fact, correct_raw])
+    p.maybe_consolidate()
+
+    result = p.retrieve_for_query(
+        make_query(
+            query_id="q-evidence-semantic",
+            entity="Alice",
+            attribute="employer",
+            question="Where does Alice work at Google?",
+            answer="Google",
+            timestamp=3,
+            session_id="s",
+            query_mode=QueryMode.CURRENT_STATE,
+        )
+    )
+    entry_ids = [entry.entry_id for entry in result.entries]
+
+    assert entry_ids.index("turn-google") < entry_ids.index("turn-meta")
+
+
 def test_odv2_hybrid_policy_names_are_explicit() -> None:
     assert _strong_policy().name == "odv2_strong"
     assert _dense_policy().name == "odv2_dense"

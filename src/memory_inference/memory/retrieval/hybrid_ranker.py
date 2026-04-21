@@ -52,8 +52,9 @@ class HybridBackbone(Protocol):
 
 
 class HybridCandidateBuilder:
-    def __init__(self, *, entity_matches) -> None:
+    def __init__(self, *, entity_matches, broad_candidate_pool: bool = False) -> None:
         self._entity_matches = entity_matches
+        self._broad_candidate_pool = broad_candidate_pool
 
     def structured_candidates(
         self,
@@ -68,16 +69,14 @@ class HybridCandidateBuilder:
             entries = [
                 entry
                 for entry in episodic_log
-                if entry.attribute == query.attribute
-                and self._entity_matches(entry.entity, query.entity)
+                if self._candidate_matches_query(entry, query)
             ]
         else:
             episodic_structured = [
                 entry
                 for entry in episodic_log
-                if entry.attribute == query.attribute
-                and self._entity_matches(entry.entity, query.entity)
-                and self.is_structured_fact(entry)
+                if self.is_structured_fact(entry)
+                and self._candidate_matches_query(entry, query)
             ]
             entries = list(current_entries) + list(archive_entries) + list(conflict_entries) + episodic_structured
         return self._dedupe(entries)
@@ -93,9 +92,9 @@ class HybridCandidateBuilder:
         candidates: list[MemoryRecord] = []
         seen_ids: set[str] = set()
         for entry in episodic_log:
-            if not self._entity_matches(entry.entity, query.entity):
+            if not self._candidate_entity_matches(entry.entity, query.entity):
                 continue
-            if entry.attribute not in {"dialogue", "event", query.attribute}:
+            if not self._evidence_attribute_matches(entry, query):
                 continue
             if entry.entry_id in seen_ids:
                 continue
@@ -108,6 +107,18 @@ class HybridCandidateBuilder:
                 seen_ids.add(entry.entry_id)
                 candidates.append(entry)
         return candidates
+
+    def fallback_candidates(
+        self,
+        query: RuntimeQuery,
+        *,
+        episodic_log: Iterable[MemoryRecord],
+    ) -> list[MemoryRecord]:
+        return self._dedupe(
+            entry
+            for entry in episodic_log
+            if self._candidate_matches_query(entry, query)
+        )
 
     @staticmethod
     def anchor_source_ids(entries: Iterable[MemoryRecord]) -> set[str]:
@@ -132,6 +143,32 @@ class HybridCandidateBuilder:
     @staticmethod
     def memory_kind(entry: MemoryRecord) -> str:
         return entry.memory_kind or "state"
+
+    def _candidate_matches_query(self, entry: MemoryRecord, query: RuntimeQuery) -> bool:
+        return (
+            self._candidate_entity_matches(entry.entity, query.entity)
+            and self._candidate_attribute_matches(entry, query)
+        )
+
+    def _candidate_entity_matches(self, entry_entity: str, query_entity: str) -> bool:
+        if self._broad_candidate_pool:
+            return True
+        return self._entity_matches(entry_entity, query_entity)
+
+    def _candidate_attribute_matches(self, entry: MemoryRecord, query: RuntimeQuery) -> bool:
+        if entry.attribute == query.attribute:
+            return True
+        if not self._broad_candidate_pool:
+            return False
+        return (
+            self.is_structured_fact(entry)
+            or entry.attribute in {"dialogue", "event"}
+        )
+
+    def _evidence_attribute_matches(self, entry: MemoryRecord, query: RuntimeQuery) -> bool:
+        if entry.attribute in {"dialogue", "event", query.attribute}:
+            return True
+        return self._broad_candidate_pool and self.is_structured_fact(entry)
 
     @staticmethod
     def _dedupe(entries: Iterable[MemoryRecord]) -> list[MemoryRecord]:
@@ -197,10 +234,14 @@ class HybridRanker:
         backbone: HybridBackbone,
         support_history_limit: int,
         entity_matches,
+        broad_candidate_pool: bool = False,
     ) -> None:
         self.backbone = backbone
         self.support_history_limit = support_history_limit
-        self.builder = HybridCandidateBuilder(entity_matches=entity_matches)
+        self.builder = HybridCandidateBuilder(
+            entity_matches=entity_matches,
+            broad_candidate_pool=broad_candidate_pool,
+        )
         self.merge_strategy = HybridMergeStrategy()
         self._entity_matches = entity_matches
 
@@ -239,12 +280,7 @@ class HybridRanker:
             conflict_entries=conflict_entries,
         )
         if not has_structured_fact_candidates(structured_candidates):
-            candidates = [
-                entry
-                for entry in episodic_log
-                if self._entity_matches(entry.entity, query.entity)
-                and entry.attribute in {query.attribute, "dialogue", "event"}
-            ]
+            candidates = self.builder.fallback_candidates(query, episodic_log=episodic_log)
             ranked = self.backbone.rank(
                 query,
                 candidates,

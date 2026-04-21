@@ -60,9 +60,10 @@ def lexical_retrieval(
     top_k: int = 8,
     policy_name: str = "",
     secondary_score_fn=None,
+    hard_entity_filter: bool = True,
 ) -> RetrievalBundle:
     entry_list = list(entries)
-    if query.entity and query.entity not in {"conversation", "all"}:
+    if hard_entity_filter and query.entity and query.entity not in {"conversation", "all"}:
         entity_matches = [entry for entry in entry_list if entry.entity == query.entity]
         if entity_matches:
             entry_list = entity_matches
@@ -95,9 +96,10 @@ def shortlist_open_ended_candidates(
     *,
     score_fn: Callable[[MemoryRecord], tuple[float, ...] | float],
     limit: int,
+    hard_entity_filter: bool = True,
 ) -> list[MemoryRecord]:
     entry_list = list(entries)
-    if query.entity and query.entity not in {"conversation", "all"}:
+    if hard_entity_filter and query.entity and query.entity not in {"conversation", "all"}:
         entity_matches = [entry for entry in entry_list if entry.entity == query.entity]
         if entity_matches:
             entry_list = entity_matches
@@ -178,6 +180,9 @@ def _coerce_score_key(score: tuple[float, ...] | float) -> tuple[float, ...]:
 class LexicalBackboneRanker:
     name = "strong"
 
+    def __init__(self, *, hard_entity_filter: bool = False) -> None:
+        self.hard_entity_filter = hard_entity_filter
+
     def index_entries(self, entries: Iterable[MemoryRecord]) -> None:
         del entries
 
@@ -194,12 +199,14 @@ class LexicalBackboneRanker:
             query,
             score_fn=lambda entry: score_fn(entry, None),
             limit=limit,
+            hard_entity_filter=self.hard_entity_filter,
         )
         result = lexical_retrieval(
             shortlisted,
             query,
             top_k=limit,
             secondary_score_fn=lambda entry: score_fn(entry, None),
+            hard_entity_filter=self.hard_entity_filter,
         )
         return list(result.entries)
 

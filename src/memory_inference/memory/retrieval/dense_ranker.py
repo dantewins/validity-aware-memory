@@ -217,9 +217,9 @@ class ODV2DenseBackboneRanker:
             else 0.0
         )
         return (
+            dense_similarity,
             anchor_bonus,
             scope_bonus,
-            dense_similarity,
             attribute_bonus,
             entry.importance,
             entry.confidence,

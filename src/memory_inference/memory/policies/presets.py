@@ -82,6 +82,7 @@ def build_odv2_policy(
     importance_threshold: float = 0.1,
     support_history_limit: int = 3,
     hybrid_backbone=None,
+    broad_candidate_pool: bool = False,
 ) -> ODV2Policy:
     return ODV2Policy(
         name=name,
@@ -89,6 +90,7 @@ def build_odv2_policy(
         importance_threshold=importance_threshold,
         support_history_limit=support_history_limit,
         hybrid_backbone=hybrid_backbone,
+        broad_candidate_pool=broad_candidate_pool,
     )
 
 
@@ -118,6 +120,7 @@ def odv2_strong_policy(
         importance_threshold=importance_threshold,
         support_history_limit=support_history_limit,
         hybrid_backbone=LexicalBackboneRanker(),
+        broad_candidate_pool=True,
     )
 
 
@@ -134,4 +137,5 @@ def odv2_dense_policy(
         importance_threshold=importance_threshold,
         support_history_limit=support_history_limit,
         hybrid_backbone=ODV2DenseBackboneRanker(encoder=encoder),
+        broad_candidate_pool=True,
     )

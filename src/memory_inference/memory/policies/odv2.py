@@ -27,6 +27,7 @@ class ODV2Policy(BaseMemoryPolicy):
         importance_threshold: float = 0.1,
         support_history_limit: int = 3,
         hybrid_backbone=None,
+        broad_candidate_pool: bool = False,
     ) -> None:
         super().__init__(name=name)
         self.support_history_limit = support_history_limit
@@ -43,6 +44,7 @@ class ODV2Policy(BaseMemoryPolicy):
                 backbone=hybrid_backbone,
                 support_history_limit=support_history_limit,
                 entity_matches=self._entity_matches,
+                broad_candidate_pool=broad_candidate_pool,
             )
             if hybrid_backbone is not None
             else None
