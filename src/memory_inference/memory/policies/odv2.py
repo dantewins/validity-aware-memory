@@ -140,6 +140,15 @@ class ODV2Policy(BaseMemoryPolicy):
             },
         )
 
+    def current_entries_for_query(self, query: RuntimeQuery) -> list[MemoryRecord]:
+        return self._current_entries(query.entity, query.attribute)
+
+    def archive_entries_for_query(self, query: RuntimeQuery) -> list[MemoryRecord]:
+        return self._archive_entries(query.entity, query.attribute)
+
+    def conflict_entries_for_query(self, query: RuntimeQuery) -> list[MemoryRecord]:
+        return self._conflict_entries(query.entity, query.attribute)
+
     def snapshot_size(self) -> int:
         return self.state_store.snapshot_size() + self.archive_store.snapshot_size()
 

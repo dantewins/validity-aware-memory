@@ -3,6 +3,7 @@ from __future__ import annotations
 from memory_inference.memory.retrieval.semantic import DenseEncoder
 from memory_inference.memory.policies.mem0 import Mem0Policy
 from memory_inference.memory.policies.odv2 import ODV2Policy
+from memory_inference.memory.policies.validity_guard import Mem0ValidityGuardPolicy
 from memory_inference.memory.retrieval import LexicalBackboneRanker, ODV2DenseBackboneRanker
 
 
@@ -72,6 +73,24 @@ def mem0_all_features_policy(
         write_top_k=write_top_k,
         history_enabled=True,
         archive_conflict_enabled=True,
+    )
+
+
+def mem0_validity_guard_policy(
+    *,
+    consolidator,
+    encoder: DenseEncoder | None = None,
+    write_top_k: int = 10,
+    importance_threshold: float = 0.1,
+    support_history_limit: int = 3,
+) -> Mem0ValidityGuardPolicy:
+    return Mem0ValidityGuardPolicy(
+        name="mem0_validity_guard",
+        consolidator=consolidator,
+        encoder=encoder,
+        write_top_k=write_top_k,
+        importance_threshold=importance_threshold,
+        support_history_limit=support_history_limit,
     )
 
 

@@ -25,6 +25,7 @@ python -m memory_inference.cli longmemeval \
   --policy strong_retrieval \
   --policy dense_retrieval \
   --policy mem0 \
+  --policy mem0_validity_guard \
   --policy offline_delta_v2 \
   --policy odv2_strong \
   --policy odv2_dense \
@@ -41,6 +42,7 @@ python -m memory_inference.cli locomo \
   --policy strong_retrieval \
   --policy dense_retrieval \
   --policy mem0 \
+  --policy mem0_validity_guard \
   --policy offline_delta_v2 \
   --policy odv2_strong \
   --policy odv2_dense \

@@ -14,6 +14,7 @@ from memory_inference.memory.policies.baselines import (
 from memory_inference.memory.policies.dense import DenseRetrievalMemoryPolicy
 from memory_inference.memory.policies.mem0 import Mem0Policy
 from memory_inference.memory.policies.odv2 import ODV2Policy
+from memory_inference.memory.policies.validity_guard import Mem0ValidityGuardPolicy
 from memory_inference.memory.policies.presets import (
     build_mem0_policy,
     build_odv2_policy,
@@ -21,6 +22,7 @@ from memory_inference.memory.policies.presets import (
     mem0_archive_conflict_policy,
     mem0_history_aware_policy,
     mem0_policy,
+    mem0_validity_guard_policy,
     odv2_dense_policy,
     odv2_strong_policy,
     offline_delta_v2_policy,
@@ -33,6 +35,7 @@ __all__ = [
     "ExactMatchMemoryPolicy",
     "LatestPerKeyPolicy",
     "Mem0Policy",
+    "Mem0ValidityGuardPolicy",
     "ODV2Policy",
     "RecencySalienceMemoryPolicy",
     "ScoredBaselinePolicy",
@@ -47,6 +50,7 @@ __all__ = [
     "mem0_archive_conflict_policy",
     "mem0_history_aware_policy",
     "mem0_policy",
+    "mem0_validity_guard_policy",
     "odv2_dense_policy",
     "odv2_strong_policy",
     "offline_delta_v2_policy",

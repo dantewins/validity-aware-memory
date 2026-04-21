@@ -18,6 +18,7 @@ COMMON_POLICIES=(
   --policy mem0_archive_conflict
   --policy mem0_history_aware
   --policy mem0_all_features
+  --policy mem0_validity_guard
   --policy offline_delta_v2
   --policy odv2_strong
   --policy odv2_dense
