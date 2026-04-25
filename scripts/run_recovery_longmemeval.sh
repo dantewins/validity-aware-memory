@@ -6,6 +6,17 @@ export HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET:-1}"
 export HF_ENABLE_PARALLEL_LOADING="${HF_ENABLE_PARALLEL_LOADING:-true}"
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [[ -z "${PYTHON_BIN}" ]]; then
+  if [[ -x ".venv/bin/python" ]]; then
+    PYTHON_BIN=".venv/bin/python"
+  elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python3)"
+  else
+    PYTHON_BIN="$(command -v python)"
+  fi
+fi
+
 MODEL_ID="${MODEL_ID:-Qwen/Qwen2.5-7B-Instruct}"
 DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-bfloat16}"
@@ -21,7 +32,7 @@ COMMON_POLICIES=(
   --policy odv2_dense
 )
 
-python -m memory_inference.cli longmemeval \
+"${PYTHON_BIN}" -m memory_inference.cli longmemeval \
   --input "${LONGMEMEVAL_INPUT}" \
   --input-format raw \
   --reasoner local-hf \
