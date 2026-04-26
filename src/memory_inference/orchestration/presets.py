@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from memory_inference.llm.mock_consolidator import MockConsolidator
+from memory_inference.llm.benchmark_consolidator import BenchmarkHeuristicConsolidator
 from memory_inference.memory.policies import (
     AppendOnlyMemoryPolicy,
     mem0_all_features_policy,
@@ -97,20 +97,20 @@ def policy_factory_by_name(name: str) -> PolicyFactory:
 
 
 def _offline_delta_factory():
-    return offline_delta_v2_policy(consolidator=MockConsolidator())
+    return offline_delta_v2_policy(consolidator=BenchmarkHeuristicConsolidator())
 
 
 def _mem0_validity_guard_factory():
-    return mem0_validity_guard_policy(consolidator=MockConsolidator())
+    return mem0_validity_guard_policy(consolidator=BenchmarkHeuristicConsolidator())
 
 
 def _odv2_mem0_hybrid_factory():
-    return odv2_mem0_hybrid_policy(consolidator=MockConsolidator())
+    return odv2_mem0_hybrid_policy(consolidator=BenchmarkHeuristicConsolidator())
 
 
 def _odv2_strong_factory():
-    return odv2_strong_policy(consolidator=MockConsolidator())
+    return odv2_strong_policy(consolidator=BenchmarkHeuristicConsolidator())
 
 
 def _odv2_dense_factory():
-    return odv2_dense_policy(consolidator=MockConsolidator())
+    return odv2_dense_policy(consolidator=BenchmarkHeuristicConsolidator())

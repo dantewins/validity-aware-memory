@@ -25,10 +25,13 @@ class StructuredFact:
 _STATEFUL_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("home_city", re.compile(r"\b(?:live|lived|living|based)\s+in\s+(?P<value>[^.!?;,]+)", re.IGNORECASE)),
     ("home_city", re.compile(r"\b(?:move|moved|moving)\s+to\s+(?P<value>[^.!?;,]+)", re.IGNORECASE)),
+    ("home_city", re.compile(r"\b(?:relocate|relocated|relocating)\s+to\s+(?P<value>[^.!?;,]+)", re.IGNORECASE)),
     ("origin", re.compile(r"\b(?:move|moved|moving)\s+from\s+(?P<value>[^.!?;,]+)", re.IGNORECASE)),
     ("employer", re.compile(r"\b(?:job|work|worked)\s+(?:at|for)\s+(?P<value>[^.!?;,]+)", re.IGNORECASE)),
     ("employer", re.compile(r"\b(?:switched|switching)\s+to\s+(?P<value>[^.!?;,]+)", re.IGNORECASE)),
     ("employer", re.compile(r"\bjoined\s+(?P<value>[A-Z][^.!?;,]+)", re.IGNORECASE)),
+    ("employer", re.compile(r"\b(?:started|start(?:ed)?)\s+(?:working\s+)?at\s+(?P<value>[^.!?;,]+)", re.IGNORECASE)),
+    ("employer", re.compile(r"\b(?:hired by|employed by)\s+(?P<value>[^.!?;,]+)", re.IGNORECASE)),
     ("education", re.compile(r"\bgraduated\s+with(?:\s+a\s+degree\s+in)?\s+(?P<value>[^.!?;,]+)", re.IGNORECASE)),
     ("education", re.compile(r"\bdegree\s+in\s+(?P<value>[^.!?;,]+)", re.IGNORECASE)),
     ("education", re.compile(r"\b(?:study|studied)\s+(?P<value>[^.!?;,]+)", re.IGNORECASE)),

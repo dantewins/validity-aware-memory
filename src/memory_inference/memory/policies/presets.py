@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from memory_inference.llm.consolidator_base import BaseConsolidator
 from memory_inference.memory.retrieval.semantic import DenseEncoder
 from memory_inference.memory.policies.mem0 import Mem0Policy
 from memory_inference.memory.policies.odv2 import ODV2Policy
+from memory_inference.memory.policies.odv2_mem0_hybrid import ODV2Mem0HybridPolicy
 from memory_inference.memory.policies.validity_guard import Mem0ValidityGuardPolicy
 from memory_inference.memory.retrieval import LexicalBackboneRanker, ODV2DenseBackboneRanker
 
@@ -96,13 +98,13 @@ def mem0_validity_guard_policy(
 
 def odv2_mem0_hybrid_policy(
     *,
-    consolidator,
+    consolidator: BaseConsolidator,
     encoder: DenseEncoder | None = None,
     write_top_k: int = 10,
     importance_threshold: float = 0.1,
     support_history_limit: int = 3,
-) -> Mem0ValidityGuardPolicy:
-    return Mem0ValidityGuardPolicy(
+) -> ODV2Mem0HybridPolicy:
+    return ODV2Mem0HybridPolicy(
         name="odv2_mem0_hybrid",
         consolidator=consolidator,
         encoder=encoder,
